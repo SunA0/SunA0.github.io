@@ -1,0 +1,114 @@
+---
+title: ClickHouse查看执行计划
+author: sunao
+tag: ["#ClickHouse","#sql","执行计划"]
+---
+最近在工作时遇到了要在原有的sql查询中加一个筛选条件的需求。看似很简单，但结果是翻了车
+
+表的结构如下
+
+```sql
+-- auto-generated definition
+create table table_test
+(
+    id                 UInt32,
+		create_time        DateTime,
+    is_deleted         UInt8,
+    version            UInt32,
+)
+    engine = MergeTree PARTITION BY toYYYYMM(create_time)
+    ORDER BY (id, create_time, table_id)
+    SETTINGS index_granularity = 8192;
+```
+
+需求很简单，表新加了个字段`is_deleted`，在现有的所有查询中都要加上一个筛选：根据id聚合后，version最大的记录中is_deleted这个字段要false。
+
+于是想都没想写下了下面的sql：
+
+```sql
+select id,create_time 
+from (
+	select id, 
+	any(create_time) create_time,
+	argMax(is_deleted,version) is_deleted
+  from table_usage tu
+  prewhere tu.is_deleted = false
+  group by id
+)
+```
+
+有经验的人就会发现问题：
+
+一个sql语句中首先执行的`Filter` ,然后是聚合函数，最后是聚合操作。
+
+上面的sql会先把is_deleted为false的记录给筛出来
+
+例如下面的数据集
+
+| id | version | is_deleted |
+| --- | --- | --- |
+| 1234 | 1 | false |
+| 1234 | 2 | false |
+| 1234 | 3 | true |
+
+按照需求，我们需要找到版本最大的记录即version为3，但是is_deleted为true所以不会出现在结果集中。
+
+但是上述的sql会先做筛选，把数据集只留下version为1和2的记录，那在之后的聚合操作is_deleted肯定是false
+
+### 聚合操作
+
+### 执行计划
+
+能写出这种sql还是对sql的执行顺序了解的不够清楚。我们要做的就是聚合之后再筛选，而不是先筛选再聚合。如何去了解sql里的执行顺序，这个时候就想到了mysql是可以用explain去查看sql的执行顺序的，而clickhouse也在20版本之后加入了explain功能
+
+> `show version();` 可以查看版本号
+>
+
+执行explain 加上actions参数之后可以看到上面的sql的执行计划
+
+```sql
+Expression ((Projection + (Before ORDER BY + (Projection + Before ORDER BY))))
+Actions: INPUT :: 0 -> id UInt32 : 0
+         INPUT : 1 -> any(create_time) DateTime : 1
+         ALIAS any(create_time) :: 1 -> create_time DateTime : 2
+Positions: 0 2
+  Aggregating
+  Keys: id
+  Aggregates:
+      any(create_time)
+        Function: any(DateTime) → DateTime
+        Arguments: create_time
+        Argument positions: 0
+    Expression (Before GROUP BY)
+    Actions: INPUT :: 0 -> create_time DateTime : 0
+             INPUT :: 1 -> id UInt32 : 1
+    Positions: 0 1
+      SettingQuotaAndLimits (Set limits and quota after reading from storage)
+        ReadFromMergeTree
+        ReadType: Default
+        Parts: 17
+        Granules: 17
+
+```
+
+可以看出执行计划是一个嵌套结构：
+
+`ReadFromMergeTree` 就是在读取数据
+
+`SettingQuotaAndLimits` 是在读取数据后设置配额和限制，例如数量，CPU，内存
+
+`ReadType`定义了读取方式，从[源码](https://github.com/ClickHouse/ClickHouse/blob/master/src/Processors/QueryPlan/ReadFromMergeTree.h)看Default，InOrder，inReverseOrder三种
+
+Parts，Granules：#TODO
+
+Positions:
+
+Actions:
+
+Aggregates:
+
+Expressions:
+
+### 有趣的现象
+
+别名

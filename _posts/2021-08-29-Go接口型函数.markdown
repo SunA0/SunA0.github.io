@@ -1,0 +1,142 @@
+---
+title: Go 接口型函数
+author: sunao
+tag: ["#go","#设计模式"]
+---
+
+接口型函数是实现了某个接口的函数。适用于只有一个方法的接口。
+
+```go
+// 定义一个接口，只包含一种方法
+type animal interface {
+    run(string)
+}
+
+// 定义一个函数类型 这个方法的参数和接口里的方法一致
+type animalFunc func(string)
+
+// 定义 animalFunc 的方法 实现animal接口
+// 执行 接收器本身
+func (afunc animalFunc) run(text string){
+    afunc(string)
+}
+```
+当看到上面这种“三件套”式的写法就意味着接口型函数要出现了。
+- 定义了一个接口。
+- 定义了一个函数类型。
+- 函数类型定义了方法实现接口，并在内部执行函数类型本身。
+
+```go
+func sayHello(text string) {
+    // do something
+}
+
+// 接口型函数
+animalFunc(sayHello)
+
+```
+现在定义了一个函数sayHello，并进行类型animalFunc的转换，实现了接口，就形成了接口型函数。
+
+那这样封装的好处是什么？
+
+## 示例
+
+先定义一个接口
+```go
+type Animal interface {
+    run()
+}
+```
+我们定义一个函数，其中需要接口作为参数
+```go
+func makeAnimalRun(something Animal){
+    something.run()
+}
+```
+现在我们要在main函数里调用这个函数，有哪些方式？
+
+第一种就是定一个类型去实现接口
+```go
+type Rabbit struct{}
+
+func (r Rabbit) run(){
+    	fmt.Println("rabbit is running")
+}
+
+type Dog struct{}
+
+func (d Dog) run(){
+    	fmt.Println("dog is running")
+}
+
+func main(){
+    
+    rabbit := Rabbit{} 
+    makeAnimalRun(rabbit)
+    //=> "rabbit is running"
+    
+    dog := Dog{}
+    makeAnimalRun(dog)
+    //=> "dog is running"
+
+}
+```
+第二种情况，我觉得每次调用<span class="capsule">makeAnimalRun</span>都要新定一个动物名字的结构体，很麻烦。现在我不想搞结构体，或者新定义个类型。
+
+于是乎我们可以用接口型函数，往<span class="capsule">makeAnimalRun</span>函数里传<span class="capsule">函数</span>作为参数
+
+```go
+type Animal interface {
+    run()
+}
+
+type AnimalFunc func()
+
+func (r AnimalFunc) run() {
+	r()
+}
+```
+以上是实现接口型函数的基本操作
+下面我们往<span class="capsule">makeAnimalRun</span>中传入函数
+```go
+
+func peopleRun(){
+    	fmt.Println("somebody is running")
+}
+
+func main(){
+    makeAnimalRun(AnimalFunc(peopleRun))
+    //=> somebody is running
+}
+```
+接口型函数的作用在此就得以实现，AnimalFunc(peopleRun)的作用是把peopleRun这个函数<span class="capsule">强制转换</span>为AnimalFunc函数类型，makeAnimalRun需要执行接口的run方法，而AnimalFunc函数类型的run方法就是执行接收器本身。
+
+我们可以进一步优化，再外套一层函数来隐藏这种强制转换。
+```go
+func makeAnimalRunFunc(f func()) {
+	makeAnimalRun(AnimalFunc(f))
+}
+```
+至此我们就可以通过传递两种参数来作为接口参数实现功能
+```go
+func main() {
+    // 传入结构体
+    rabbit := Rabbit{} 
+    makeAnimalRun(rabbit) //=> "rabbit is running"
+
+    
+    // 传入函数，函数被强制转换实现了接口
+    makeAnimalRun(AnimalFunc(peopleRun)) //=> "somebody is running"
+	
+    // 封装了强制转换，直接传函数
+    makeAnimalRunFunc(peopleRun) //=> "somebody is running"
+}
+
+```
+总结下来，接口型函数的意义，就是使有些需要接口作为参数的函数上，传入的参数可以是实现了该接口的类型，也可以是函数，这个函数是被满足接口的函数类型强制转换了。
+
+参考
+
+https://geektutu.com/post/7days-golang-q1.html
+
+https://blog.csdn.net/michael__li/article/details/53941399
