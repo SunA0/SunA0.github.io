@@ -1,0 +1,70 @@
+---
+title: go-svc源码解读
+author: sunao
+tag: ["#go-svc"]
+---
+
+看nsq的几个关键组件如nsqd，nsqlookup，发现都在使用一个叫go-svc的包来启动服务
+
+也不知道这个包的作用，所以先看了一下。
+
+从官方的示例可以了解到go-svc可以帮助你实现一个守护进程，在代码中你要自定类型并实现go-svc定义的service接口，在代码中可以看到定义
+
+```go
+type Service interface {
+	
+	Init(Environment) error
+
+	Start() error
+
+	Stop() error
+}
+```
+
+- `Init` 方法在程序/服务开始运行之前调用，并在确定程序是否作为Windows服务运行之后调用。这个方法必须是非阻塞的
+- `Start`方法在Init之后调用。该方法必须是非阻塞的
+- `Stop`方法在收到syscall.SIGINT或syscall.SIGTERM信号时调用，或者在Windows服务停止时调用
+
+从这个接口就看出，Service就是定义了在一个服务启动关闭时可以自定夹私货的一套方法。下面是Run方法的结构
+
+```go
+func Run(service Service, sig ...os.Signal) error {
+	// Init ...
+	// Start ...
+	// 等待信号
+}
+```
+
+Init和Start部分就是执行你的接口实现函数
+
+等待信号这部分代码如下
+
+```go
+func Run(service Service, sig ...os.Signal) error {
+	// Init ...
+	// 
+
+	if len(sig) == 0 {
+		sig = []os.Signal{syscall.SIGINT, syscall.SIGTERM}
+	}
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, sig...)
+
+	var ctx context.Context
+	if s, ok := service.(Context); ok {
+		ctx = s.Context()
+	} else {
+		ctx = context.Background()
+	}
+
+	select {
+	case <-signalChan:
+	case <-ctx.Done():
+	}
+
+	return service.Stop()
+}
+```
+
+接收到传入的信号量或者上下文后，当前goroutine不再阻塞，执行实现Stop的函数
