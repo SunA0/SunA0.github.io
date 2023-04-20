@@ -1,0 +1,90 @@
+
+<!--<div class="container content" style="text-align: center">-->
+<!--   this is the life-->
+<!--</div>-->
+
+
+<div class="container">
+   <div class="left" onclick="changeBeforeImage()">
+      <img src="https://tse4-mm.cn.bing.net/th/id/OIP-C.fZKdXHctc92E7MO1cz9AAgHaJe?pid=ImgDet&rs=1"
+           alt="Left Image"
+           class="image">
+   </div>
+   <div class="right" onclick="changeNextImage()">
+      <img src="https://tse4-mm.cn.bing.net/th/id/OIP-C.fZKdXHctc92E7MO1cz9AAgHaJe?pid=ImgDet&rs=1"
+           alt="Right Image 1"
+           class="image">
+   </div>
+</div>
+<script>
+   let index = 0
+   const imageList = [
+      'https://tse4-mm.cn.bing.net/th/id/OIP-C.fZKdXHctc92E7MO1cz9AAgHaJe?pid=ImgDet&rs=1',
+      'https://n.sinaimg.cn/sinakd10111/400/w1200h800/20200713/1dd1-iwhseit8630457.jpg',
+      'https://pic.3gbizhi.com/2019/0929/20190929121142250.jpg'];
+   // 获取右侧图片元素和图片列表
+   let rightImage = document.querySelector('.right .image');
+   let leftImage = document.querySelector('.left img');
+
+   function changeNextImage(){
+      index += 1
+      rightImage.src = imageList[index];
+      leftImage.src = imageList[index];
+   }
+
+   function changeBeforeImage(){
+      index -= 1
+      rightImage.src = imageList[index];
+      leftImage.src = imageList[index];
+   }
+</script>
+<style>
+   html, body {
+      height: 100%;
+      margin: 0;
+   }
+   /* 页面容器 */
+   .container {
+      display: flex;
+      height: 100%;
+      overflow: hidden;
+   }
+
+   /* 左侧容器，居中图片 */
+   .left {
+      flex: 1;
+      flex-basis: 50%;
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+   }
+   .left img {
+      max-width: 100%;
+      max-height: 100%;
+      transition: opacity 0.5s;
+      opacity: 1;
+   }
+
+   /* 右侧容器，充满屏幕展示图片 */
+   .right {
+      flex: 1;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+      flex-basis: 50%;
+   }
+
+   /* 图片样式，充满右侧容器 */
+   .right .image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      filter: blur(20px);
+   }
+
+</style>
+
+
+

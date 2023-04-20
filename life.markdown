@@ -1,8 +1,8 @@
 ---
-layout: about
+layout: life
 title: 关于我
 author: sunao
-permalink: /about
+permalink: /life
 mail: hey@sunao.fun
 ---
 ```
